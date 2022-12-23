@@ -119,6 +119,46 @@ class SmartBattery:
         self.refresh_data()
         return int.from_bytes(self.basic_information_and_status[8:10], byteorder='big', signed=True)
 
+    def balance_status(self, cell_number=0) -> bool:
+        self.refresh_data()
+        if cell_number <= 16:
+            return int.from_bytes(self.basic_information_and_status[12:14], byteorder='big') & (1 << cell_number) == 1
+
+        return int.from_bytes(self.basic_information_and_status[14:16], byteorder='big') & (1 << (cell_number - 16)) == 1
+
+    def protection_status(self) -> [str]:
+        self.refresh_data()
+        status = []
+        protect = int.from_bytes(self.basic_information_and_status[16:18], byteorder='big');
+        if protect & 0x1:
+            status.append('Cell Block Over-Vol')
+        if protect & (1 << 1):
+            status.append('Cell Bock Under-Vol')
+        if protect & (1 << 2):
+            status.append('Battery Over-Vol')
+        if protect & (1 << 3):
+            status.append('Battery Under-Vol')
+        if protect & (1 << 4):
+            status.append('Charging Over-Temp')
+        if protect & (1 << 5):
+            status.append('Charging Low-Temp')
+        if protect & (1 << 6):
+            status.append('Discharging Over-Temp')
+        if protect & (1 << 7):
+            status.append('Discharging Low-Temp')
+        if protect & (1 << 8):
+            status.append('Charging Over-Current')
+        if protect & (1 << 9):
+            status.append('Discharging Over-Current')
+        if protect & (1 << 10):
+            status.append('Short Circuit')
+        if protect & (1 << 11):
+            status.append('Fore-end IC Error')
+        if protect & (1 << 12):
+            status.append('MOS Software Lock-In')
+
+        return status
+
     def version(self) -> str:
         self.refresh_data()
         return str((self.basic_information_and_status[18] & 0xF0) >> 4) + '.' + \
@@ -127,3 +167,27 @@ class SmartBattery:
     def capacity_percent(self) -> int:
         self.refresh_data()
         return self.basic_information_and_status[19]
+
+    def control_status(self) -> str:
+        self.refresh_data()
+        status = 'MOS OFF'
+
+        if self.basic_information_and_status[20] & 1:
+            status = 'Charging'
+        elif self.basic_information_and_status[20] & (1 << 1):
+            status = 'Discharging'
+
+        return status
+
+    def num_cells(self) -> int:
+        return self.basic_information_and_status[21]
+
+    def battery_temps_f(self) -> [float]:
+        temps = []
+
+        for i in range(self.basic_information_and_status[22]):
+            temps.append((float(
+                int.from_bytes(self.basic_information_and_status[23 + (i * 2):25 + (i * 2)], byteorder='big')) * 0.1)
+                         * 1.8 - 459.67)
+
+        return temps
