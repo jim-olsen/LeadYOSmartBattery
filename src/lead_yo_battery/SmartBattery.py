@@ -45,7 +45,7 @@ class SmartBattery:
                 self.basic_information_and_status = bytearray()
                 data_length_of_response = int.from_bytes(bytearray([0x00]) + data[3:4], byteorder='big')
                 logger.debug("Total length of data response %s", str(data_length_of_response))
-                self.basic_information_and_status = bytearray(data[4:-3])
+                self.basic_information_and_status = bytearray(data[4:])
                 logger.debug("Current response data: " + str(self.basic_information_and_status))
                 if len(self.basic_information_and_status) == data_length_of_response:
                     logger.debug("Got all the data, proceeding")
@@ -53,7 +53,9 @@ class SmartBattery:
                 else:
                     logger.debug("Response data not complete, waiting for more data to arrive")
             elif data_length_of_response != 0:
+                logger.debug("Appending additional data")
                 self.basic_information_and_status.extend(data[:-3])
+                logger.debug("New length of data is now %s", len(self.basic_information_and_status))
                 if len(self.basic_information_and_status) >= data_length_of_response:
                     logger.debug("Got all the data, proceeding")
                     command_complete.set()
@@ -73,7 +75,8 @@ class SmartBattery:
     def get_basic_info_and_status(self):
         asyncio.run(self.async_get_basic_info_and_status())
 
-    def voltage(self):
+    def voltage(self) -> float:
         if self.basic_information_and_status is None:
             self.get_basic_info_and_status()
+        return float(int.from_bytes(self.basic_information_and_status[0:2], byteorder='big')) / 100
 
