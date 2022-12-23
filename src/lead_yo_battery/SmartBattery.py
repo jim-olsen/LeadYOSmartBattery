@@ -1,5 +1,7 @@
 import asyncio
 import logging
+import time
+
 from bleak import BleakClient
 
 logger = logging.getLogger('lead_yo_battery')
@@ -8,11 +10,13 @@ class SmartBattery:
     SPP_DATA_UUID = '0000ff01-0000-1000-8000-00805f9b34fb'
     SPP_COMMAND_UUID = '0000ff02-0000-1000-8000-00805f9b34fb'
 
-    def __init__(self, battery_address):
+    def __init__(self, battery_address, battery_name):
         self.battery_address = battery_address
+        self.battery_name = battery_name
         self.spp_command_characteristic = None
         self.spp_data_characteristic = None
         self.basic_information_and_status = None
+        self.last_basic_info_update = None
 
     async def async_update_characteristics(self, client):
         self.spp_data_characteristic = None
@@ -59,24 +63,40 @@ class SmartBattery:
                 if len(self.basic_information_and_status) >= data_length_of_response:
                     logger.debug("Got all the data, proceeding")
                     command_complete.set()
+            else:
+                self.basic_information_and_status = None
+                command_complete.set()
 
-
-        async with BleakClient(self.battery_address) as client:
-            if self.spp_data_characteristic is None or self.spp_command_characteristic is None:
-                await self.async_update_characteristics(client)
-            command_complete.clear()
-            await client.start_notify(self.spp_data_characteristic, data_received)
-            await asyncio.sleep(2)
-            logger.debug("Sending command to fetch basic info and status from battery")
-            await client.write_gatt_char(self.spp_command_characteristic,
+        self.basic_information_and_status = None
+        while self.basic_information_and_status is None:
+            try:
+                async with BleakClient(self.battery_address) as client:
+                    await self.async_update_characteristics(client)
+                    await client.start_notify(self.spp_data_characteristic, data_received)
+                    while self.basic_information_and_status is None:
+                        try:
+                            command_complete.clear()
+                            logger.debug("Sending command to fetch basic info and status from battery")
+                            await client.write_gatt_char(self.spp_command_characteristic,
                                          bytearray([0xDD, 0xA5, 0x03, 0x00, 0xFF, 0xFD, 0x77]), response=False)
-            await command_complete.wait()
+                            await asyncio.wait_for(command_complete.wait(), 1)
+                        except Exception as e:
+                            logger.error("Failed to receive result from battery to command request: %s" + str(e))
+            except Exception as e:
+                logger.error("Failed to connect to battery: " + str(e))
+            except asyncio.exceptions.CancelledError as ce:
+                logger.error("Failed to connect to battery: " + str(ce))
+        self.last_basic_info_update = time.time()
 
     def get_basic_info_and_status(self):
         asyncio.run(self.async_get_basic_info_and_status())
 
+    def name(self) -> str:
+        return self.battery_name
+
     def voltage(self) -> float:
-        if self.basic_information_and_status is None:
+        if self.basic_information_and_status is None or self.last_basic_info_update is None or \
+                time.time() - self.last_basic_info_update >= 5:
             self.get_basic_info_and_status()
         return float(int.from_bytes(self.basic_information_and_status[0:2], byteorder='big')) / 100
 
