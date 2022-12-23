@@ -11,4 +11,10 @@ for i in range(10):
     for battery in batteries:
         print("Battery: " + battery.name())
         print("     Voltage: " + str(battery.voltage()))
+        print("     Current: " + str(battery.current()))
+        print("     Residual Capacity: " + str(battery.residual_capacity()))
+        print("     Nominal Capacity: " + str(battery.nominal_capacity()))
+        print("     Cycles: " + str(battery.cycles()))
+        print("     Version: " + str(battery.version()))
+        print("     Percent Charged: " + str(battery.capacity_percent()) + "%")
     time.sleep(3)

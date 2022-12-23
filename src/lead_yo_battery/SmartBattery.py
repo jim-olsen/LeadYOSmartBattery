@@ -47,7 +47,7 @@ class SmartBattery:
             # If we receive the correct response to our request to get the info start gathering it
             if data[:2] == bytearray([0xDD, 0x03]):
                 self.basic_information_and_status = bytearray()
-                data_length_of_response = int.from_bytes(bytearray([0x00]) + data[3:4], byteorder='big')
+                data_length_of_response = data[3]
                 logger.debug("Total length of data response %s", str(data_length_of_response))
                 self.basic_information_and_status = bytearray(data[4:])
                 logger.debug("Current response data: " + str(self.basic_information_and_status))
@@ -81,11 +81,11 @@ class SmartBattery:
                                          bytearray([0xDD, 0xA5, 0x03, 0x00, 0xFF, 0xFD, 0x77]), response=False)
                             await asyncio.wait_for(command_complete.wait(), 1)
                         except Exception as e:
-                            logger.error("Failed to receive result from battery to command request: %s" + str(e))
+                            logger.error("Failed to receive result from battery to command request: %s", str(e))
             except Exception as e:
-                logger.error("Failed to connect to battery: " + str(e))
+                logger.error("Failed to connect to battery: %s", str(e))
             except asyncio.exceptions.CancelledError as ce:
-                logger.error("Failed to connect to battery: " + str(ce))
+                logger.error("Failed to connect to battery: %s", str(ce))
         self.last_basic_info_update = time.time()
 
     def get_basic_info_and_status(self):
@@ -94,9 +94,36 @@ class SmartBattery:
     def name(self) -> str:
         return self.battery_name
 
-    def voltage(self) -> float:
+    def refresh_data(self):
         if self.basic_information_and_status is None or self.last_basic_info_update is None or \
                 time.time() - self.last_basic_info_update >= 5:
             self.get_basic_info_and_status()
+
+    def voltage(self) -> float:
+        self.refresh_data()
         return float(int.from_bytes(self.basic_information_and_status[0:2], byteorder='big')) / 100
 
+    def current(self) -> float:
+        self.refresh_data()
+        return float(int.from_bytes(self.basic_information_and_status[2:4], byteorder='big', signed=True)) / 100
+
+    def residual_capacity(self) -> float:
+        self.refresh_data()
+        return float(int.from_bytes(self.basic_information_and_status[4:6], byteorder='big', signed=True)) / 100
+
+    def nominal_capacity(self) -> float:
+        self.refresh_data()
+        return float(int.from_bytes(self.basic_information_and_status[6:8], byteorder='big', signed=True)) / 100
+
+    def cycles(self) -> int:
+        self.refresh_data()
+        return int.from_bytes(self.basic_information_and_status[8:10], byteorder='big', signed=True)
+
+    def version(self) -> str:
+        self.refresh_data()
+        return str((self.basic_information_and_status[18] & 0xF0) >> 4) + '.' + \
+               str(self.basic_information_and_status[18] & 0x0F)
+
+    def capacity_percent(self) -> int:
+        self.refresh_data()
+        return self.basic_information_and_status[19]
