@@ -15,7 +15,8 @@ for i in range(10):
         print("     Residual Capacity: " + str(battery.residual_capacity()))
         print("     Nominal Capacity: " + str(battery.nominal_capacity()))
         print("     Cycles: " + str(battery.cycles()))
-        print("     Cell 1 Balance Status: " + str(battery.balance_status(1)))
+        for i in range(battery.num_cells()):
+            print("     Cell " + str(i + 1) + " Balance Status: " + str(battery.balance_status(i + 1)))
         print("     Protection Issues: " + str(battery.protection_status()))
         print("     Version: " + str(battery.version()))
         print("     Percent Charged: " + str(battery.capacity_percent()) + "%")
