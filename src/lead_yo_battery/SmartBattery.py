@@ -16,6 +16,7 @@ class SmartBattery:
         self.spp_command_characteristic = None
         self.spp_data_characteristic = None
         self.basic_information_and_status = None
+        self.cell_block_voltage = None
         self.last_basic_info_update = None
 
     async def async_update_characteristics(self, client):
@@ -39,32 +40,46 @@ class SmartBattery:
     async def async_get_basic_info_and_status(self):
         command_complete = asyncio.Event()
         data_length_of_response = 0
+        current_data_queue = bytearray()
 
         def data_received(characteristic, data):
             nonlocal data_length_of_response
+            nonlocal current_data_queue
             logger.debug("Received data: %s", str(data))
 
             # If we receive the correct response to our request to get the info start gathering it
             if data[:2] == bytearray([0xDD, 0x03]):
-                self.basic_information_and_status = bytearray()
                 data_length_of_response = data[3]
                 logger.debug("Total length of data response %s", str(data_length_of_response))
                 self.basic_information_and_status = bytearray(data[4:])
+                current_data_queue = self.basic_information_and_status
                 logger.debug("Current response data: " + str(self.basic_information_and_status))
-                if len(self.basic_information_and_status) == data_length_of_response:
+                if len(self.basic_information_and_status) >= data_length_of_response:
+                    logger.debug("Got all the data, proceeding")
+                    command_complete.set()
+                else:
+                    logger.debug("Response data not complete, waiting for more data to arrive")
+            elif data[:2] == bytearray([0xDD, 0x04]):
+                data_length_of_response = data[3]
+                logger.debug("Total length of data response %s", str(data_length_of_response))
+                self.cell_block_voltage = bytearray(data[4:])
+                current_data_queue = self.cell_block_voltage
+                logger.debug("Current response data: " + str(self.basic_information_and_status))
+                if len(self.cell_block_voltage) >= data_length_of_response:
                     logger.debug("Got all the data, proceeding")
                     command_complete.set()
                 else:
                     logger.debug("Response data not complete, waiting for more data to arrive")
             elif data_length_of_response != 0:
                 logger.debug("Appending additional data")
-                self.basic_information_and_status.extend(data[:-3])
+                current_data_queue.extend(data[:-3])
                 logger.debug("New length of data is now %s", len(self.basic_information_and_status))
-                if len(self.basic_information_and_status) >= data_length_of_response:
+                if len(current_data_queue) >= data_length_of_response:
                     logger.debug("Got all the data, proceeding")
                     command_complete.set()
             else:
                 self.basic_information_and_status = None
+                self.cell_block_voltage = None
                 command_complete.set()
 
         self.basic_information_and_status = None
@@ -79,6 +94,25 @@ class SmartBattery:
                             logger.debug("Sending command to fetch basic info and status from battery")
                             await client.write_gatt_char(self.spp_command_characteristic,
                                          bytearray([0xDD, 0xA5, 0x03, 0x00, 0xFF, 0xFD, 0x77]), response=False)
+                            await asyncio.wait_for(command_complete.wait(), 1)
+                        except Exception as e:
+                            logger.error("Failed to receive result from battery to command request: %s", str(e))
+            except Exception as e:
+                logger.error("Failed to connect to battery: %s", str(e))
+            except asyncio.exceptions.CancelledError as ce:
+                logger.error("Failed to connect to battery: %s", str(ce))
+        self.cell_block_voltage = None
+        while self.cell_block_voltage is None:
+            try:
+                async with BleakClient(self.battery_address) as client:
+                    await self.async_update_characteristics(client)
+                    await client.start_notify(self.spp_data_characteristic, data_received)
+                    while self.cell_block_voltage is None:
+                        try:
+                            command_complete.clear()
+                            logger.debug("Sending command to fetch cell block info from battery")
+                            await client.write_gatt_char(self.spp_command_characteristic,
+                                                         bytearray([0xDD, 0xA5, 0x04, 0x00, 0xFF, 0xFC, 0x77]), response=False)
                             await asyncio.wait_for(command_complete.wait(), 1)
                         except Exception as e:
                             logger.error("Failed to receive result from battery to command request: %s", str(e))
@@ -180,9 +214,11 @@ class SmartBattery:
         return status
 
     def num_cells(self) -> int:
+        self.refresh_data()
         return self.basic_information_and_status[21]
 
     def battery_temps_f(self) -> [float]:
+        self.refresh_data()
         temps = []
 
         for i in range(self.basic_information_and_status[22]):
@@ -191,3 +227,11 @@ class SmartBattery:
                          * 1.8 - 459.67)
 
         return temps
+
+    def cell_block_voltages(self) -> [float]:
+        self.refresh_data()
+        voltages = []
+        for i in range(0, self.num_cells() * 2, 2):
+            voltages.append(float(int.from_bytes(self.cell_block_voltage[i:i + 2], byteorder='big')) / 1000)
+
+        return voltages

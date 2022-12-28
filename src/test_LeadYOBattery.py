@@ -23,4 +23,5 @@ for i in range(10):
         print("     Current Status: " + battery.control_status())
         print("     Number of Cells: " + str(battery.num_cells()))
         print("     Temperatures: " + str(battery.battery_temps_f()))
+        print("     Cell Voltages: " + str(battery.cell_block_voltages()))
     time.sleep(3)
