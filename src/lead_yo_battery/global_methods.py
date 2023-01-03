@@ -16,7 +16,7 @@ async def async_find_all_batteries() -> [SmartBattery]:
         manufacturer_data = d.metadata.get('manufacturer_data', {})
         if 15984 in manufacturer_data:
             logger.info("Found battery %s at %s", str(d.name), str(d.address))
-            found_batteries.append(SmartBattery(d.address, d.name))
+            found_batteries.append(SmartBattery(d, d.name))
 
     return found_batteries
 

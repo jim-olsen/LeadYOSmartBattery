@@ -2,7 +2,8 @@ import asyncio
 import logging
 import time
 
-from bleak import BleakClient
+from bleak import BleakClient, BLEDevice
+from typing import Union
 
 logger = logging.getLogger('lead_yo_battery')
 
@@ -10,7 +11,7 @@ class SmartBattery:
     SPP_DATA_UUID = '0000ff01-0000-1000-8000-00805f9b34fb'
     SPP_COMMAND_UUID = '0000ff02-0000-1000-8000-00805f9b34fb'
 
-    def __init__(self, battery_address, battery_name):
+    def __init__(self, battery_address: Union[BLEDevice, str], battery_name):
         self.battery_address = battery_address
         self.battery_name = battery_name
         self.spp_command_characteristic = None
