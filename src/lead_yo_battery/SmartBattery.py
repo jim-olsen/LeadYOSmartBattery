@@ -84,7 +84,8 @@ class SmartBattery:
                 command_complete.set()
 
         self.basic_information_and_status = None
-        while self.basic_information_and_status is None:
+        self.cell_block_voltage = None
+        while self.basic_information_and_status is None or self.cell_block_voltage is None:
             try:
                 async with BleakClient(self.battery_address) as client:
                     await self.async_update_characteristics(client)
@@ -98,16 +99,6 @@ class SmartBattery:
                             await asyncio.wait_for(command_complete.wait(), 1)
                         except Exception as e:
                             logger.error("Failed to receive result from battery to command request: %s", str(e))
-            except Exception as e:
-                logger.error("Failed to connect to battery: %s", str(e))
-            except asyncio.exceptions.CancelledError as ce:
-                logger.error("Failed to connect to battery: %s", str(ce))
-        self.cell_block_voltage = None
-        while self.cell_block_voltage is None:
-            try:
-                async with BleakClient(self.battery_address) as client:
-                    await self.async_update_characteristics(client)
-                    await client.start_notify(self.spp_data_characteristic, data_received)
                     while self.cell_block_voltage is None:
                         try:
                             command_complete.clear()
@@ -117,6 +108,7 @@ class SmartBattery:
                             await asyncio.wait_for(command_complete.wait(), 1)
                         except Exception as e:
                             logger.error("Failed to receive result from battery to command request: %s", str(e))
+
             except Exception as e:
                 logger.error("Failed to connect to battery: %s", str(e))
             except asyncio.exceptions.CancelledError as ce:
