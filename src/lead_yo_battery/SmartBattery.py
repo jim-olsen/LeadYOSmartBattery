@@ -108,6 +108,7 @@ class SmartBattery:
                             await asyncio.wait_for(command_complete.wait(), 1)
                         except Exception as e:
                             logger.error("Failed to receive result from battery to command request: %s", str(e))
+                await client.disconnect()
 
             except Exception as e:
                 logger.error("Failed to connect to battery: %s", str(e))
