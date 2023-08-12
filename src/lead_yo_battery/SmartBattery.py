@@ -85,7 +85,7 @@ class SmartBattery:
 
         self.basic_information_and_status = None
         self.cell_block_voltage = None
-        while self.basic_information_and_status is None or self.cell_block_voltage is None:
+        if self.basic_information_and_status is None or self.cell_block_voltage is None:
             try:
                 async with BleakClient(self.battery_address) as client:
                     await self.async_update_characteristics(client)
