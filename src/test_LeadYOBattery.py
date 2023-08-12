@@ -9,7 +9,7 @@ batteries = find_all_batteries()
 print("Found batteries: " + str(batteries))
 for i in range(10):
     for battery in batteries:
-        if battery.name.startswith('BANK'):
+        if battery.name().startswith('BANK'):
             print("Battery: " + battery.name())
             print("     Voltage: " + str(battery.voltage()))
             print("     Current: " + str(battery.current()))
