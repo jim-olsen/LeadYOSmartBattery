@@ -28,4 +28,5 @@ for i in range(10):
                 print("     Cell Voltages: " + str(battery.cell_block_voltages()))
             except Exception as e:
                 print(e)
-    time.sleep(3)
+            time.sleep(5)
+    time.sleep(30)
