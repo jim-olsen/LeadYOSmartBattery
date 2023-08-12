@@ -10,11 +10,12 @@ async def async_find_all_batteries() -> [SmartBattery]:
 
     logger.debug("Finding all available batteries within range")
     found_batteries = []
-    devices = await BleakScanner.discover(timeout=10, return_adv=False)
+    devices = await BleakScanner.discover(timeout=30, return_adv=False)
     for d in devices:
         logger.debug('%s>>%s>>%s>>%s', str(d.name), str(d.address), str(d.metadata), str(d.rssi))
-        manufacturer_data = d.metadata.get('manufacturer_data', {})
-        if 15984 in manufacturer_data or 24208 in manufacturer_data:
+        uuids = d.metadata.get('uuids', {})
+
+        if '0000ff00-0000-1000-8000-00805f9b34fb' in uuids:
             logger.info("Found battery %s at %s", str(d.name), str(d.address))
             found_batteries.append(SmartBattery(d.address, d.name))
 

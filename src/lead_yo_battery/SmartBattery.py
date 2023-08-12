@@ -229,3 +229,9 @@ class SmartBattery:
             voltages.append(float(int.from_bytes(self.cell_block_voltage[i:i + 2], byteorder='big')) / 1000)
 
         return voltages
+
+    def __str__(self):
+        return f'{self.battery_name} SmartBattery'
+
+    def __repr__(self):
+        return f'Name: {self.battery_name}, Address: {self.battery_address}'
